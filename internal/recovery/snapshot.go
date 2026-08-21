@@ -18,6 +18,7 @@ type Record struct {
 	Version   int64
 	UpdatedAt time.Time
 	Payload   json.RawMessage
+	Labels    map[string]string
 }
 
 type Snapshot struct {
@@ -61,6 +62,7 @@ func Build(tenant string, schema int, records []Record, at time.Time) (Snapshot,
 		}
 		seen[key] = struct{}{}
 		record.Payload = append(json.RawMessage(nil), record.Payload...)
+		normalizeLabels(record.Labels)
 	}
 	sortRecords(copyRecords)
 	snapshot := Snapshot{TenantID: tenant, CreatedAt: at, Schema: schema, Records: copyRecords}
@@ -89,7 +91,7 @@ func Hash(snapshot Snapshot) string {
 	hasher := sha256.New()
 	_, _ = fmt.Fprintf(hasher, "%s\x00%d\x00%s\x00", snapshot.TenantID, snapshot.Schema, snapshot.CreatedAt.UTC().Format(time.RFC3339Nano))
 	for _, record := range records {
-		_, _ = fmt.Fprintf(hasher, "%s\x00%s\x00%s\x00%d\x00%s\x00", record.Kind, record.ID, record.TenantID, record.Version, record.UpdatedAt.UTC().Format(time.RFC3339Nano))
+		_, _ = fmt.Fprintf(hasher, "%s\x00%s\x00%s\x00%d\x00%s\x00%v\x00", record.Kind, record.ID, record.TenantID, record.Version, record.UpdatedAt.UTC().Format(time.RFC3339Nano), sortedLabels(record.Labels))
 		hasher.Write(record.Payload)
 		hasher.Write([]byte{0})
 	}
